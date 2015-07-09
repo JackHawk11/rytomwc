@@ -186,8 +186,7 @@ void loop() {
     Serial.println();
     delay(4000);
   }
-  delay(500);
-   incrementTime(60);
+  delay(600);
 }
 
 void incrementTime(int intSeconds) {
@@ -322,7 +321,7 @@ void displayTime() {
   }
   if (minute() > 54) {
     strCurrentTime = "five ";
-    selectedINCMT[1] = 1;
+    selectedINCMT[0] = 1;
     setMinuteInterval(60 - minute());
   }
 
@@ -615,7 +614,6 @@ void displayTime() {
 }
 
 void setMinuteInterval(int interval) {
-  Serial.println(interval);
   switch (interval) {
     case 1:
       grid.setPixelColor(196, colorBlue);
