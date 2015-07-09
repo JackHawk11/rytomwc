@@ -36,6 +36,11 @@ uint32_t colorRed = grid.Color(255, 0, 0);
 uint32_t colorGreen = grid.Color(0, 255, 0);
 uint32_t colorBlue = grid.Color(0, 0, 255);
 uint32_t colorJGreen = grid.Color(50, 179, 30);
+uint32_t colorMagenta = grid.Color(179, 70, 2);
+uint32_t colorYellow = grid.Color(240, 240, 67);
+uint32_t colorTeal = grid.Color(67, 237, 240);
+uint32_t colorOrange = grid.Color(237, 89, 26);
+
 
 // THATS SO METAL
 int THATS[5] = {51, 52, 53, 54, 55};
@@ -165,7 +170,7 @@ void loop() {
 
     // and finaly we display the time (provided we are not in self tes mode
     displayTime();
-   // displayMonth();
+    // displayMonth();
     // numOneStunna();
     //thatsSoMetal();
     //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
@@ -178,7 +183,7 @@ void loop() {
     Serial.println();
     delay(4000);
   }
-  delay(600);
+  delay(500);
 }
 
 void incrementTime(int intSeconds) {
@@ -211,9 +216,7 @@ void digitalClockDisplay() {
 
 
 void displayTime() {
-  String strCurrentTime; // build the current time
-  //colorWipe(colorBlack, 0);
-  // Now, turn on the "It is" leds
+  String strCurrentTime;
   paintWord(arrIT, sizeof(arrIT),  colorWhite);
   paintWord(arrIS, sizeof(arrIS),  colorWhite);
 
@@ -250,71 +253,79 @@ void displayTime() {
 
   // now we display the appropriate minute counter
   
-  grid.setPixelColor(196, colorBlue);
-  grid.setPixelColor(197, colorBlue);
-  grid.setPixelColor(198, colorBlue);
-  grid.setPixelColor(199, colorBlue);
-  
+  if ((minute() > 0) && (minute() < 5)) {
+    setMinuteInterval(5 - minute());
+  }
   if ((minute() > 4) && (minute() < 10)) {
     // FIVE MINUTES
     strCurrentTime = "five ";
     selectedINCMT[0] = 1;
+    setMinuteInterval(10 - minute());
   }
   if ((minute() > 9) && (minute() < 15)) {
     //TEN MINUTES;
     strCurrentTime = "ten ";
     selectedINCMT[1] = 1;
+    setMinuteInterval(15 - minute());
   }
   if ((minute() > 14) && (minute() < 20)) {
     // QUARTER
     strCurrentTime = "a quarter ";
     selectedINCMT[2] = 1;
     selectedINCMT[3] = 1;
+    setMinuteInterval(20 - minute());
   }
   if ((minute() > 19) && (minute() < 25)) {
     //TWENTY MINUTES
     strCurrentTime = "twenty ";
     selectedINCMT[5] = 1;
+    setMinuteInterval(25 - minute());
   }
   if ((minute() > 24) && (minute() < 30)) {
     //TWENTY FIVE
     strCurrentTime = "twenty five ";
     selectedINCMT[0] = 1;
     selectedINCMT[5] = 1;
+    setMinuteInterval(30 - minute());
   }
   if ((minute() > 29) && (minute() < 35)) {
     strCurrentTime = "half ";
     selectedINCMT[4] = 1;
+    setMinuteInterval(35 - minute());
   }
   if ((minute() > 34) && (minute() < 40)) {
     //TWENTY FIVE
     strCurrentTime = "twenty five ";
     selectedINCMT[0] = 1;
     selectedINCMT[5] = 1;
-
+    setMinuteInterval(40 - minute());
   }
   if ((minute() > 39) && (minute() < 45)) {
     strCurrentTime = "twenty ";
     selectedINCMT[5] = 1;
+    setMinuteInterval(45 - minute());
   }
   if ((minute() > 44) && (minute() < 50)) {
     strCurrentTime = "a quarter ";
     selectedINCMT[2] = 1;
     selectedINCMT[3] = 1;
+    setMinuteInterval(50 - minute());
   }
   if ((minute() > 49) && (minute() < 55)) {
     strCurrentTime = "ten ";
     selectedINCMT[1] = 1;
+    setMinuteInterval(55 - minute());
   }
   if (minute() > 54) {
     strCurrentTime = "five ";
     selectedINCMT[1] = 1;
+    setMinuteInterval(60 - minute());
   }
 
   //paint the words
   for (int i = 0; i < 6; i++) {
     if (!selectedINCMT[i]) {
-      blackoutTWord(minuteINCMT[i].word, minuteINCMT[i].length,  colorWhite);
+      paintTWord(minuteINCMT[i].word, minuteINCMT[i].length,  colorBlack);
     } else {
       paintTWord(minuteINCMT[i].word, minuteINCMT[i].length,  colorWhite);
     }
@@ -377,7 +388,7 @@ void displayTime() {
       case 11:
       case 23:
         strCurrentTime = strCurrentTime + "eleven ";
-        selectedHourINCMT[10] = 6;
+        selectedHourINCMT[10] = 1;
         break;
       case 0:
       case 12:
@@ -390,24 +401,25 @@ void displayTime() {
     //paint the words
     for (int i = 0; i < 12; i++) {
       if (!selectedHourINCMT[i]) {
-        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorBlack);
       } else {
         paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
       }
     }
 
     strCurrentTime = strCurrentTime + "oclock ";
-    // paintWord(arrPAST, sizeof(arrPAST), colorBlack);
+    paintWord(arrPAST, sizeof(arrPAST), colorBlack);
     paintWord(arrOCLOCK, sizeof(arrOCLOCK), colorWhite);
-    //paintWord(arrTO, sizeof(arrTO), colorBlack);
+    paintWord(arrTO, sizeof(arrTO), colorBlack);
 
 
     // we are more than 4 minutes but less and 35 minutes past top of hour
   } else if ((minute() < 35) && (minute() > 4)) {
     strCurrentTime = strCurrentTime + "past ";
     paintWord(arrPAST, sizeof(arrPAST),  colorWhite);
-    //paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
-    //paintWord(arrTO, sizeof(arrTO), colorBlack);
+    paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
+    paintWord(arrTO, sizeof(arrTO), colorBlack);
+
     switch (hour()) {
       case 1:
       case 13:
@@ -474,7 +486,7 @@ void displayTime() {
     //paint the words
     for (int i = 0; i < 12; i++) {
       if (!selectedHourINCMT[i]) {
-        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length,  colorBlack);
       } else {
         paintTWord(hourINCMT[i].word, hourINCMT[i].length,  colorWhite);
       }
@@ -484,8 +496,8 @@ void displayTime() {
     // the next hour, as we will be displaying a 'to' sign
   } else {
     strCurrentTime = strCurrentTime + "to ";
-    // paintWord(arrPAST, sizeof(arrPAST),  colorBlack);
-    // paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
+    paintWord(arrPAST, sizeof(arrPAST),  colorBlack);
+    paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
     paintWord(arrTO, sizeof(arrTO),  colorWhite);
 
     switch (hour()) {
@@ -554,27 +566,29 @@ void displayTime() {
     //paint the words
     for (int i = 0; i < 12; i++) {
       if (!selectedHourINCMT[i]) {
-        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorBlack);
       } else {
         paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
       }
     }
   }
 
-  // Midnight and AM or PM
-  if (hour() == 0 and minute() == 0) {
-    paintWord(arrMIDNIGHT, sizeof(arrMIDNIGHT), colorBlue);
-  } else {
-    if (isAM()) {
-      paintWord(arrIN, sizeof(arrIN), colorGreen);
-      paintWord(THE, sizeof(THE), colorGreen);
-      paintWord(arrMORNING, sizeof(arrMORNING), colorGreen);
-    }
-    if (isPM() && hour() > 5) {
-      paintWord(arrIN, sizeof(arrIN), colorJGreen);
-      paintWord(THE, sizeof(THE), colorJGreen);
-      paintWord(arrEVENING, sizeof(arrEVENING), colorJGreen);
-    }
+  // Change AM and PM colors
+  if (isAM() && hour() > 6) {
+    paintWord(AM, sizeof(AM), colorMagenta);
+    paintWord(PM, sizeof(PM), colorBlack);
+  }
+  if (isAM() && hour() <= 6) {
+    paintWord(AM, sizeof(AM), colorYellow);
+    paintWord(PM, sizeof(PM), colorBlack);
+  }
+  if (isPM() && hour() < 17) {
+    paintWord(PM, sizeof(PM), colorJGreen);
+    paintWord(AM, sizeof(AM), colorBlack);
+  }
+  if (isPM() && hour() >= 17) {
+    paintWord(PM, sizeof(PM), colorJGreen);
+    paintWord(AM, sizeof(AM), colorBlack);
   }
 
   if (strCurrentTime != strTime) {
@@ -585,6 +599,49 @@ void displayTime() {
     }
   } else {
     //    grid.show();
+  }
+}
+
+void setMinuteInterval(int interval) {
+  Serial.println(interval);
+  switch (interval) {
+    case 1:
+      grid.setPixelColor(196, colorBlue);
+      grid.setPixelColor(199, colorBlue);
+      grid.setPixelColor(198, colorBlue);
+      grid.setPixelColor(197, colorBlue);
+      break;
+    case 2:
+      grid.setPixelColor(196, colorBlue);
+      grid.setPixelColor(199, colorBlue);
+      grid.setPixelColor(198, colorBlue);
+      grid.setPixelColor(197, colorBlack);
+      break;
+    case 3:
+      grid.setPixelColor(196, colorBlue);
+      grid.setPixelColor(199, colorBlue);
+      grid.setPixelColor(198, colorBlack);
+      grid.setPixelColor(197, colorBlack);
+      break;
+    case 4:
+      grid.setPixelColor(196, colorBlue);
+      grid.setPixelColor(199, colorBlack);
+      grid.setPixelColor(198, colorBlack);
+      grid.setPixelColor(197, colorBlack);
+      break;
+    case 5:
+      grid.setPixelColor(196, colorBlack);
+      grid.setPixelColor(199, colorBlack);
+      grid.setPixelColor(198, colorBlack);
+      grid.setPixelColor(197, colorBlack);
+      break;
+    case 0:
+      grid.setPixelColor(196, colorBlack);
+      grid.setPixelColor(199, colorBlack);
+      grid.setPixelColor(198, colorBlack);
+      grid.setPixelColor(197, colorBlack);
+      break;
+
   }
 }
 
@@ -669,27 +726,13 @@ uint32_t Wheel(byte WheelPos) {
   }
 }
 
-// Blackout Time keeping Word
-void blackoutTWord(int* arrWord, int len, uint32_t intColor) {
-  uint32_t pixelColor;
-  for (int i = 0; i < len; i++) {
-   pixelColor =  grid.getPixelColor(arrWord[i]);
-   if(pixelColor == intColor){
-	grid.setPixelColor(arrWord[i], colorBlack);
-   }
-  }
-}
+
 
 // Paint Time Keeping Word
 void paintTWord(int* arrWord, int len, uint32_t intColor) {
   uint32_t pixelColor;
   for (int i = 0; i < len; i++) {
-   pixelColor =  grid.getPixelColor(arrWord[i]);
-   
-   // if refreshing the time color (white) or the LED is off
-   if((pixelColor == intColor) || (pixelColor == colorBlack)){
-	grid.setPixelColor(arrWord[i], intColor);
-   }
+    grid.setPixelColor(arrWord[i], intColor);
   }
 }
 
