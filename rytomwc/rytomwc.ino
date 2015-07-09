@@ -151,13 +151,15 @@ void loop() {
     // test to see if a forward button is being held down for time setting
     if (digitalRead(FWDButtonPIN) == HIGH) {
       Serial.println("Forward Button Down");
-      incrementTime(60);
+      //incrementTime(60);
+      RTC.adjust(now.unixtime() + 60);
     }
 
     // test to see if the back button is being held down for time setting
     if (digitalRead(REVButtonPIN) == HIGH) {
       Serial.println("Backwards Button Down");
-      incrementTime(-60);
+      //incrementTime(-60);
+      RTC.adjust(now.unixtime() -60);
     }
 
     // and finaly we display the time (provided we are not in self tes mode
@@ -168,19 +170,6 @@ void loop() {
     //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
     grid.show();
   delay(600);
-}
-
-void incrementTime(int intSeconds) {
-  // increment the time counters keeping care to rollover as required
-  if (timeStatus() == timeSet) {
-    Serial.print("adding ");
-    Serial.print(intSeconds);
-    Serial.println(" seconds to RTC");
-    adjustTime(intSeconds);
-    RTC.adjust(now() + intSeconds);
-    digitalClockDisplay();
-    displayTime();
-  }
 }
 
 void digitalClockDisplay() {
