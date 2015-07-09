@@ -1,0 +1,776 @@
+/*
+ * To set the RTC for the first time you have to send a string consisting of
+ * the letter T followed by ten digit time (as seconds since Jan 1 1970) Also known as EPOCH time.
+ *
+ * You can send the text "T1357041600" on the next line using Serial Monitor to set the clock to noon Jan 1 2013
+ * Or you can use the following command via linux terminal to set the clock to the current time (UTC time zone)
+ * date +T%s > /dev/ttyACM0
+ * Inside the processSyncMessage() function I'm offsetting the UTC time with Central time.
+ * If you want the clock to be accurate for your time zone, you may need to update the value.
+ */
+#include <Adafruit_NeoPixel.h>
+#include <Time.h>
+#include <Wire.h>
+#include <DS1307RTC.h>  // a basic DS1307 library that returns time as a time_t
+
+#define FWDButtonPIN 8
+#define REVButtonPIN 9
+
+#define N_LEDS 200 // 115 x 15 grid + four corners
+#define TIME_HEADER  "T"   // Header tag for serial time sync message
+#define BRIGHTNESSDAY 150 // full on
+#define BRIGHTNESSNIGHT 10 // half on
+
+Adafruit_NeoPixel grid = Adafruit_NeoPixel(200 , 4, NEO_GRB + NEO_KHZ800);
+
+// a few vars to keep the peace;
+int intBrightness; // the brightness of the clock (0 = off and 255 = 100%)
+int intTestMode = 0; // set when both buttons are held down
+String strTime = ""; // used to detect if word time has changed
+int intTimeUpdated = 0; // used to tell if we need to turn on the brightness again when words change
+
+// a few colors
+uint32_t colorWhite = grid.Color(255, 255, 255);
+uint32_t colorBlack = grid.Color(0, 0, 0);
+uint32_t colorRed = grid.Color(255, 0, 0);
+uint32_t colorGreen = grid.Color(0, 255, 0);
+uint32_t colorBlue = grid.Color(0, 0, 255);
+uint32_t colorJGreen = grid.Color(50, 179, 30);
+
+// THATS SO METAL
+int THATS[5] = {51, 52, 53, 54, 55};
+int SO[2] = {38, 37};
+int METAL[5] = {9, 10, 11, 12, 13};
+
+// BIRTH DAY
+int BIRTH[5] = {15, 16, 17, 18, 19};
+int DAY[3] = {2, 1, 0};
+
+// #ONE STUNNA
+int NUMONE[4] = {133, 132, 131, 130};
+int STUNNA[6] = {56, 57, 58, 59, 60};
+
+// RYANNES AND TOMMYS
+int RYANNES[7] = {98, 97, 70, 69, 42, 41, 14}; //RYANNES
+int TOMMYS[6] = {34, 33, 32, 31, 30, 29}; //TOMMYS
+
+// RYANNE AND TOMMY
+int RYANNE[7] = {98, 97, 70, 69, 42, 41}; //RYANNE
+int TOMMY[6] = {934, 33, 32, 31, 30}; //TOMMY
+
+// OTHER RANDOM WORDS
+int WEDDING[7] = {96, 72, 66, 46, 36, 20, 6}; //WEDDING
+int LOVE[4] = {84, 85, 86, 87};
+int HIS[3] = {144, 136, 114};
+int OUR[3] = {129, 128, 127};
+
+// PREPOSITIONS
+int arrA[1] = {189};
+int arrIT[2] = {182, 183};
+int arrIS[2] = {185, 186};
+int arrIN[2] = {57, 56};
+int arrTO[2] = {149, 148};
+
+// INTERVALS
+int QUARTER[7] = {181, 180, 179, 178, 177, 176, 175};
+int arrHALF[4] = {195, 194, 193, 192};
+int arrPAST[4] = {153, 152, 151, 150};
+int arrOCLOCK[6] = {22, 23, 24, 25, 26, 27};
+int AM[2] = {7, 8};
+int PM[2] = {4, 5};
+
+// NUMBERS
+int arrONE[3] = {144, 145, 146};
+int arrTWO[3] = {140, 141, 142};
+int arrTHREE[5] = {127, 128, 129, 130, 131};
+int arrFOUR[4] = {133, 134, 135, 136};
+int arrFIVE[4] = {125, 124, 123, 122};
+int arrMFIVE[4] = {161, 162, 163, 164};
+int arrSIX[3] = {120, 119, 118};
+int arrSEVEN[5] = {116, 115, 114, 113, 112};
+int arrEIGHT[5] = {99, 100, 101, 102, 103};
+int arrNINE[4] = {104, 105, 106, 107};
+int arrTEN[3] = {109, 110, 111};
+int arrMTEN[3] = {173, 172, 171};
+int arrELEVEN[6] = {94, 93, 92, 91, 90, 89};
+int arrTWELVE[6] = {77, 78, 79, 80, 81, 82};
+int arrTWENTY[6] = {154, 155, 156, 157, 158, 159};
+
+
+
+void setup() {
+  // set up the debuging serial output
+  Serial.begin(9600);
+  //while(!Serial); // Needed for Leonardo only
+  delay(200);
+  setSyncProvider(RTC.get);   // the function to get the time from the RTC
+  setSyncInterval(60); // sync the time every 60 seconds (1 minutes)
+  if (timeStatus() != timeSet) {
+    Serial.println("Unable to sync with the RTC");
+    RTC.set(1406278800);   // set the RTC to Jul 25 2014 9:00 am
+    setTime(1406278800);
+  } else {
+    Serial.println("RTC has set the system time");
+  }
+
+  // setup the LED strip
+  grid.begin();
+  grid.show();
+
+  // set the bright ness of the strip
+  grid.setBrightness(intBrightness);
+
+
+  // initialize the buttons
+  pinMode(FWDButtonPIN, INPUT);
+  pinMode(REVButtonPIN, INPUT);
+
+  // lets kick off the clock
+  digitalClockDisplay();
+}
+
+void loop() {
+  // if there is a serial connection lets see if we need to set the time
+  if (Serial.available()) {
+    time_t t = processSyncMessage();
+    if (t != 0) {
+      Serial.print("Time set via connection to: ");
+      Serial.print(t);
+      Serial.println();
+      RTC.set(t);   // set the RTC and the system time to the received value
+      setTime(t);
+    }
+  }
+  // check to see if the time has been set
+  if (timeStatus() == timeSet) {
+    // time is set lets show the time
+    if ((hour() < 7) | (hour() >= 19)) {
+      intBrightness =  BRIGHTNESSNIGHT;
+    } else {
+      intBrightness =  BRIGHTNESSDAY;
+    }
+    grid.setBrightness(intBrightness);
+
+    // test to see if a forward button is being held down for time setting
+    if (digitalRead(FWDButtonPIN) == HIGH) {
+      Serial.println("Forward Button Down");
+      incrementTime(60);
+    }
+
+    // test to see if the back button is being held down for time setting
+    if (digitalRead(REVButtonPIN) == HIGH) {
+      Serial.println("Backwards Button Down");
+      incrementTime(-60);
+    }
+
+    // and finaly we display the time (provided we are not in self tes mode
+    displayTime();
+   // displayMonth();
+    // numOneStunna();
+    //thatsSoMetal();
+    //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
+    grid.show();
+  } else {
+    colorWipe(colorBlack, 0);
+    grid.setPixelColor(0, colorRed);
+    Serial.println("The time has not been set.  Please run the Time");
+    Serial.println("TimeRTCSet example, or DS1307RTC SetTime example.");
+    Serial.println();
+    delay(4000);
+  }
+  delay(600);
+}
+
+void incrementTime(int intSeconds) {
+  // increment the time counters keeping care to rollover as required
+  if (timeStatus() == timeSet) {
+    Serial.print("adding ");
+    Serial.print(intSeconds);
+    Serial.println(" seconds to RTC");
+    //colorWipe(colorBlack, 0);
+    adjustTime(intSeconds);
+    RTC.set(now() + intSeconds);
+    digitalClockDisplay();
+    displayTime();
+  }
+}
+
+void digitalClockDisplay() {
+  // digital clock display of the time
+  Serial.print(hour());
+  printDigits(minute());
+  printDigits(second());
+  Serial.print(" ");
+  Serial.print(year());
+  Serial.print("-");
+  Serial.print(month());
+  Serial.print("-");
+  Serial.print(day());
+  Serial.println();
+}
+
+
+void displayTime() {
+  String strCurrentTime; // build the current time
+  //colorWipe(colorBlack, 0);
+  // Now, turn on the "It is" leds
+  paintWord(arrIT, sizeof(arrIT),  colorWhite);
+  paintWord(arrIS, sizeof(arrIS),  colorWhite);
+
+  // set up the struct
+  struct mi {
+    int* word;
+    int length;
+  };
+
+  mi minuteINCMT[6];
+  minuteINCMT[0] = mi {arrMFIVE, 4};
+  minuteINCMT[1]  = mi {arrMTEN, 3};
+  minuteINCMT[2]  = mi {arrA, 1};
+  minuteINCMT[3]  = mi {QUARTER, 7};
+  minuteINCMT[4]  = mi {arrHALF, 4};
+  minuteINCMT[5]  = mi {arrTWENTY, 6};
+  int selectedINCMT[] =  {0, 0, 0, 0, 0, 0};
+
+  //hour array
+  mi hourINCMT[12];
+  hourINCMT[0]  = mi {arrONE, 3};
+  hourINCMT[1]  = mi {arrTWO, 3};
+  hourINCMT[2]  = mi {arrTHREE, 5};
+  hourINCMT[3]  = mi {arrFOUR, 4};
+  hourINCMT[4]  = mi {arrFIVE, 4};
+  hourINCMT[5]  = mi {arrSIX, 3};
+  hourINCMT[6]  = mi {arrSEVEN, 5};
+  hourINCMT[7]  = mi {arrEIGHT, 5};
+  hourINCMT[8]  = mi {arrNINE, 4};
+  hourINCMT[9]  = mi {arrTEN, 3};
+  hourINCMT[10]  = mi {arrELEVEN, 6};
+  hourINCMT[11]  = mi {arrTWELVE, 6};
+  int selectedHourINCMT[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+  // now we display the appropriate minute counter
+  
+  grid.setPixelColor(196, colorBlue);
+  grid.setPixelColor(197, colorBlue);
+  grid.setPixelColor(198, colorBlue);
+  grid.setPixelColor(199, colorBlue);
+  
+  if ((minute() > 4) && (minute() < 10)) {
+    // FIVE MINUTES
+    strCurrentTime = "five ";
+    selectedINCMT[0] = 1;
+  }
+  if ((minute() > 9) && (minute() < 15)) {
+    //TEN MINUTES;
+    strCurrentTime = "ten ";
+    selectedINCMT[1] = 1;
+  }
+  if ((minute() > 14) && (minute() < 20)) {
+    // QUARTER
+    strCurrentTime = "a quarter ";
+    selectedINCMT[2] = 1;
+    selectedINCMT[3] = 1;
+  }
+  if ((minute() > 19) && (minute() < 25)) {
+    //TWENTY MINUTES
+    strCurrentTime = "twenty ";
+    selectedINCMT[5] = 1;
+  }
+  if ((minute() > 24) && (minute() < 30)) {
+    //TWENTY FIVE
+    strCurrentTime = "twenty five ";
+    selectedINCMT[0] = 1;
+    selectedINCMT[5] = 1;
+  }
+  if ((minute() > 29) && (minute() < 35)) {
+    strCurrentTime = "half ";
+    selectedINCMT[4] = 1;
+  }
+  if ((minute() > 34) && (minute() < 40)) {
+    //TWENTY FIVE
+    strCurrentTime = "twenty five ";
+    selectedINCMT[0] = 1;
+    selectedINCMT[5] = 1;
+
+  }
+  if ((minute() > 39) && (minute() < 45)) {
+    strCurrentTime = "twenty ";
+    selectedINCMT[5] = 1;
+  }
+  if ((minute() > 44) && (minute() < 50)) {
+    strCurrentTime = "a quarter ";
+    selectedINCMT[2] = 1;
+    selectedINCMT[3] = 1;
+  }
+  if ((minute() > 49) && (minute() < 55)) {
+    strCurrentTime = "ten ";
+    selectedINCMT[1] = 1;
+  }
+  if (minute() > 54) {
+    strCurrentTime = "five ";
+    selectedINCMT[1] = 1;
+  }
+
+  //paint the words
+  for (int i = 0; i < 6; i++) {
+    if (!selectedINCMT[i]) {
+      blackoutTWord(minuteINCMT[i].word, minuteINCMT[i].length,  colorWhite);
+    } else {
+      paintTWord(minuteINCMT[i].word, minuteINCMT[i].length,  colorWhite);
+    }
+  }
+
+
+  // if we are less than 5 minutes past top of the hour
+  if (minute() < 5) {
+    switch (hour()) {
+      case 1:
+      case 13:
+        strCurrentTime = strCurrentTime + "one ";
+        selectedHourINCMT[0] = 1;
+        break;
+      case 2:
+      case 14:
+        strCurrentTime = strCurrentTime + "two ";
+        selectedHourINCMT[1] = 1;
+        break;
+      case 3:
+      case 15:
+        strCurrentTime = strCurrentTime + "three ";
+        selectedHourINCMT[2] = 1;
+        break;
+      case 4:
+      case 16:
+        strCurrentTime = strCurrentTime + "four ";
+        selectedHourINCMT[3] = 1;
+        break;
+      case 5:
+      case 17:
+        strCurrentTime = strCurrentTime + "five ";
+        selectedHourINCMT[4] = 1;
+        break;
+      case 6:
+      case 18:
+        strCurrentTime = strCurrentTime + "six ";
+        selectedHourINCMT[5] = 1;
+        break;
+      case 7:
+      case 19:
+        strCurrentTime = strCurrentTime + "seven ";
+        selectedHourINCMT[6] = 1;
+        break;
+      case 8:
+      case 20:
+        strCurrentTime = strCurrentTime + "eight ";
+        selectedHourINCMT[7] = 1;
+        break;
+      case 9:
+      case 21:
+        strCurrentTime = strCurrentTime + "nine ";
+        selectedHourINCMT[8] = 1;
+        break;
+      case 10:
+      case 22:
+        strCurrentTime = strCurrentTime + "ten ";
+        selectedHourINCMT[9] = 1;
+        break;
+      case 11:
+      case 23:
+        strCurrentTime = strCurrentTime + "eleven ";
+        selectedHourINCMT[10] = 6;
+        break;
+      case 0:
+      case 12:
+      case 24:
+        strCurrentTime = strCurrentTime + "twelve ";
+        selectedHourINCMT[11] = 1;
+        break;
+    }
+
+    //paint the words
+    for (int i = 0; i < 12; i++) {
+      if (!selectedHourINCMT[i]) {
+        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+      } else {
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+      }
+    }
+
+    strCurrentTime = strCurrentTime + "oclock ";
+    // paintWord(arrPAST, sizeof(arrPAST), colorBlack);
+    paintWord(arrOCLOCK, sizeof(arrOCLOCK), colorWhite);
+    //paintWord(arrTO, sizeof(arrTO), colorBlack);
+
+
+    // we are more than 4 minutes but less and 35 minutes past top of hour
+  } else if ((minute() < 35) && (minute() > 4)) {
+    strCurrentTime = strCurrentTime + "past ";
+    paintWord(arrPAST, sizeof(arrPAST),  colorWhite);
+    //paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
+    //paintWord(arrTO, sizeof(arrTO), colorBlack);
+    switch (hour()) {
+      case 1:
+      case 13:
+        strCurrentTime = strCurrentTime + "one ";
+        selectedHourINCMT[0] = 1;
+        break;
+      case 2:
+      case 14:
+        strCurrentTime = strCurrentTime + "two ";
+        selectedHourINCMT[1] = 1;
+        break;
+      case 3:
+      case 15:
+        strCurrentTime = strCurrentTime + "three ";
+        selectedHourINCMT[2] = 1;
+        break;
+      case 4:
+      case 16:
+        strCurrentTime = strCurrentTime + "four ";
+        selectedHourINCMT[3] = 1;
+        break;
+      case 5:
+      case 17:
+        strCurrentTime = strCurrentTime + "five ";
+        selectedHourINCMT[4] = 1;
+        break;
+      case 6:
+      case 18:
+        strCurrentTime = strCurrentTime + "six ";
+        selectedHourINCMT[5] = 1;
+        break;
+      case 7:
+      case 19:
+        strCurrentTime = strCurrentTime + "seven ";
+        selectedHourINCMT[6] = 1;
+        break;
+      case 8:
+      case 20:
+        strCurrentTime = strCurrentTime + "eight ";
+        selectedHourINCMT[7] = 1;
+        break;
+      case 9:
+      case 21:
+        strCurrentTime = strCurrentTime + "nine ";
+        selectedHourINCMT[8] = 1;
+        break;
+      case 10:
+      case 22:
+        strCurrentTime = strCurrentTime + "ten ";
+        selectedHourINCMT[9] = 1;
+        break;
+      case 11:
+      case 23:
+        strCurrentTime = strCurrentTime + "eleven ";
+        selectedHourINCMT[10] = 1;
+        break;
+      case 0:
+      case 12:
+      case 24:
+        strCurrentTime = strCurrentTime + "twelve ";
+        selectedHourINCMT[11] = 1;
+        break;
+    }
+    //paint the words
+    for (int i = 0; i < 12; i++) {
+      if (!selectedHourINCMT[i]) {
+        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+      } else {
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length,  colorWhite);
+      }
+    }
+
+    // if we are greater than 34 minutes past the hour then display
+    // the next hour, as we will be displaying a 'to' sign
+  } else {
+    strCurrentTime = strCurrentTime + "to ";
+    // paintWord(arrPAST, sizeof(arrPAST),  colorBlack);
+    // paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
+    paintWord(arrTO, sizeof(arrTO),  colorWhite);
+
+    switch (hour()) {
+      case 1:
+      case 13:
+        strCurrentTime = strCurrentTime + "two ";
+        selectedHourINCMT[1] = 1;
+        break;
+      case 14:
+      case 2:
+        strCurrentTime = strCurrentTime + "three ";
+        selectedHourINCMT[2] = 1;
+        break;
+      case 15:
+      case 3:
+        strCurrentTime = strCurrentTime + "four ";
+        selectedHourINCMT[3] = 1;
+        break;
+      case 4:
+      case 16:
+        strCurrentTime = strCurrentTime + "five ";
+        selectedHourINCMT[4] = 1;
+        break;
+      case 5:
+      case 17:
+        strCurrentTime = strCurrentTime + "six ";
+        selectedHourINCMT[5] = 1;
+        break;
+      case 6:
+      case 18:
+        strCurrentTime = strCurrentTime + "seven ";
+        selectedHourINCMT[6] = 1;
+        break;
+      case 7:
+      case 19:
+        strCurrentTime = strCurrentTime + "eight ";
+        selectedHourINCMT[7] = 1;
+        break;
+      case 8:
+      case 20:
+        strCurrentTime = strCurrentTime + "nine ";
+        selectedHourINCMT[8] = 1;
+        break;
+      case 9:
+      case 21:
+        strCurrentTime = strCurrentTime + "ten ";
+        selectedHourINCMT[9] = 1;
+        break;
+      case 10:
+      case 22:
+        strCurrentTime = strCurrentTime + "eleven ";
+        selectedHourINCMT[10] = 1;
+        break;
+      case 11:
+      case 23:
+        strCurrentTime = strCurrentTime + "twelve ";
+        selectedHourINCMT[11] = 1;
+        break;
+      case 0:
+      case 12:
+      case 24:
+        strCurrentTime = strCurrentTime + "one ";
+        selectedHourINCMT[0] = 1;
+        break;
+    }
+    //paint the words
+    for (int i = 0; i < 12; i++) {
+      if (!selectedHourINCMT[i]) {
+        blackoutTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+      } else {
+        paintTWord(hourINCMT[i].word, hourINCMT[i].length, colorWhite);
+      }
+    }
+  }
+
+  // Midnight and AM or PM
+  if (hour() == 0 and minute() == 0) {
+    paintWord(arrMIDNIGHT, sizeof(arrMIDNIGHT), colorBlue);
+  } else {
+    if (isAM()) {
+      paintWord(arrIN, sizeof(arrIN), colorGreen);
+      paintWord(THE, sizeof(THE), colorGreen);
+      paintWord(arrMORNING, sizeof(arrMORNING), colorGreen);
+    }
+    if (isPM() && hour() > 5) {
+      paintWord(arrIN, sizeof(arrIN), colorJGreen);
+      paintWord(THE, sizeof(THE), colorJGreen);
+      paintWord(arrEVENING, sizeof(arrEVENING), colorJGreen);
+    }
+  }
+
+  if (strCurrentTime != strTime) {
+    digitalClockDisplay();
+    strTime = strCurrentTime;
+    if (strTime == "") {
+      fadeIn(20);
+    }
+  } else {
+    //    grid.show();
+  }
+}
+
+
+
+//@todo
+void RYANNESBIRTHDAY() {
+  paintWord(DAY, sizeof(DAY), colorJGreen);
+  delay(1000);
+  paintWord(BIRTH, sizeof(BIRTH), colorJGreen);
+  delay(1000);
+  paintWord(RYANNE, sizeof(RYANNE), colorJGreen);
+  delay(1000);
+}
+
+void printDigits(int digits) {
+  // utility function for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if (digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+void rainbow(uint8_t wait) {
+  //secret rainbow mode
+  uint16_t i, j;
+
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < grid.numPixels(); i++) {
+      grid.setPixelColor(i, Wheel((i + j) & 255));
+    }
+    grid.show();
+    delay(wait);
+  }
+}
+
+static void chase(uint32_t color, uint8_t wait) {
+  for (uint16_t i = 0; i < grid.numPixels() + 4; i++) {
+    grid.setPixelColor(i  , color); // Draw new pixel
+    grid.setPixelColor(i - 4, 0); // Erase pixel a few steps back
+    grid.show();
+    delay(wait);
+  }
+}
+
+void fadeOut(int time) {
+  for (int i = intBrightness; i > 0; --i) {
+    grid.setBrightness(i);
+    grid.show();
+    delay(time);
+  }
+}
+
+void fadeIn(int time) {
+  for (int i = 1; i < intBrightness; ++i) {
+    grid.setBrightness(i);
+    grid.show();
+    delay(time);
+  }
+}
+
+// Fill the dots one after the other with a color
+void colorWipe(uint32_t color, uint8_t wait) {
+  for (uint16_t i = 0; i < grid.numPixels(); i++) {
+    grid.setPixelColor(i, color);
+  }
+  grid.show();
+  delay(wait);
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  if (WheelPos < 85) {
+    return grid.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if (WheelPos < 170) {
+    WheelPos -= 85;
+    return grid.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+    WheelPos -= 170;
+    return grid.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+}
+
+// Blackout Time keeping Word
+void blackoutTWord(int* arrWord, int len, uint32_t intColor) {
+  uint32_t pixelColor;
+  for (int i = 0; i < len; i++) {
+   pixelColor =  grid.getPixelColor(arrWord[i]);
+   if(pixelColor == intColor){
+	grid.setPixelColor(arrWord[i], colorBlack);
+   }
+  }
+}
+
+// Paint Time Keeping Word
+void paintTWord(int* arrWord, int len, uint32_t intColor) {
+  uint32_t pixelColor;
+  for (int i = 0; i < len; i++) {
+   pixelColor =  grid.getPixelColor(arrWord[i]);
+   
+   // if refreshing the time color (white) or the LED is off
+   if((pixelColor == intColor) || (pixelColor == colorBlack)){
+	grid.setPixelColor(arrWord[i], intColor);
+   }
+  }
+}
+
+void paintWord(int* arrWord, size_t len, uint32_t intColor) {
+  len = (len  / sizeof( int ));
+  for (int i = 0; i < len; i++) {
+    grid.setPixelColor(arrWord[i], intColor);
+  }
+}
+
+void spellWord(int arrWord[], uint32_t intColor) {
+  for (int i = 0; i < grid.numPixels() + 1; i++) {
+    if (arrWord[i] == -1) {
+      break;
+    } else {
+      grid.setPixelColor(arrWord[i], intColor);
+      grid.show();
+      delay(500);
+    }
+  }
+}
+
+// print out the software version number
+void printVersion(void) {
+  delay(2000);
+  Serial.println();
+  Serial.println("This word clock was specially built to celebrate the Marriage of Tommy and Ryanne");
+  Serial.println("June 20th 2015");
+  Serial.println();
+}
+
+unsigned long processSyncMessage() {
+  unsigned long pctime = 0L;
+  const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013
+
+  if (Serial.find(TIME_HEADER)) {
+    pctime = Serial.parseInt();
+    pctime = pctime - 18000;
+    return pctime;
+    if ( pctime < DEFAULT_TIME) { // check the value is a valid time (greater than Jan 1 2013)
+      pctime = 0L; // return 0 to indicate that the time is not valid
+    }
+    Serial.println();
+    Serial.println("Time Set via Serial");
+    Serial.println();
+  }
+  return pctime;
+}
+
+void thatsSoMetal() {
+  paintWord(THATS, sizeof(THATS), colorRed);
+  paintWord(SO, sizeof(SO), colorRed);
+  paintWord(METAL, sizeof(METAL), colorRed);
+}
+
+void numOneStunna() {
+  paintWord(NUMONE, sizeof(NUMONE), colorBlue);
+  paintWord(STUNNA, sizeof(STUNNA), colorBlue);
+}
+
+
+//Birthdays
+void isBirthday() {
+  // Ryannes Birthday
+  if ((month() == 3) && (day() == 29)) {
+    paintWord(RYANNES, sizeof(RYANNES), colorBlue);
+    paintWord(BIRTH, sizeof(BIRTH), colorBlue);
+    paintWord(DAY, sizeof(DAY), colorBlue);
+  }
+
+  // Toms Birthday
+  if ((month() == 7) && (day() == 10)) {
+    paintWord(TOMMYS, sizeof(TOMMYS), colorRed);
+    paintWord(BIRTH, sizeof(BIRTH), colorRed);
+    paintWord(DAY, sizeof(DAY), colorRed);
+  }
+
+  // Jack's Birthday
+  if ((month() == 7) && (day() == 11)) {
+    paintWord(BIRTH, sizeof(BIRTH), colorRed);
+    paintWord(DAY, sizeof(DAY), colorRed);
+  }
+}
+
