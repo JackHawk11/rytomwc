@@ -9,9 +9,11 @@
  * If you want the clock to be accurate for your time zone, you may need to update the value.
  */
 #include <Adafruit_NeoPixel.h>
-#include <Time.h>
 #include <Wire.h>
-#include <DS1307RTC.h>  // a basic DS1307 library that returns time as a time_t
+#include "RTClib.h"
+#include <Time.h>
+
+RTC_DS1307 RTC;
 
 #define FWDButtonPIN 8
 #define REVButtonPIN 9
@@ -109,16 +111,14 @@ int arrTWENTY[6] = {154, 155, 156, 157, 158, 159};
 void setup() {
   // set up the debuging serial output
   Serial.begin(9600);
-  //while(!Serial); // Needed for Leonardo only
-  delay(200);
-  setSyncProvider(RTC.get);   // the function to get the time from the RTC
-  setSyncInterval(60); // sync the time every 60 seconds (1 minutes)
-  if (timeStatus() != timeSet) {
-    Serial.println("Unable to sync with the RTC");
-    RTC.set(1406278800);   // set the RTC to Jul 25 2014 9:00 am
-    setTime(1406278800);
-  } else {
-    Serial.println("RTC has set the system time");
+    Wire.begin();
+    RTC.begin();
+ 
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    //RTC.adjust(DateTime(__DATE__, __TIME__));
+     grid.setPixelColor(0, colorRed);
   }
 
   // setup the LED strip
@@ -138,19 +138,8 @@ void setup() {
 }
 
 void loop() {
-  // if there is a serial connection lets see if we need to set the time
-  if (Serial.available()) {
-    time_t t = processSyncMessage();
-    if (t != 0) {
-      Serial.print("Time set via connection to: ");
-      Serial.print(t);
-      Serial.println();
-      RTC.set(t);   // set the RTC and the system time to the received value
-      setTime(t);
-    }
-  }
-  // check to see if the time has been set
-  if (timeStatus() == timeSet) {
+  DateTime now = RTC.now();
+
     // time is set lets show the time
     if ((hour() < 7) | (hour() >= 19)) {
       intBrightness =  BRIGHTNESSNIGHT;
@@ -178,14 +167,6 @@ void loop() {
     //thatsSoMetal();
     //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
     grid.show();
-  } else {
-
-    grid.setPixelColor(0, colorRed);
-    Serial.println("The time has not been set.  Please run the Time");
-    Serial.println("TimeRTCSet example, or DS1307RTC SetTime example.");
-    Serial.println();
-    delay(4000);
-  }
   delay(600);
 }
 
@@ -195,9 +176,8 @@ void incrementTime(int intSeconds) {
     Serial.print("adding ");
     Serial.print(intSeconds);
     Serial.println(" seconds to RTC");
-    //colorWipe(colorBlack, 0);
     adjustTime(intSeconds);
-    RTC.set(now() + intSeconds);
+    RTC.adjust(now() + intSeconds);
     digitalClockDisplay();
     displayTime();
   }
@@ -219,6 +199,21 @@ void digitalClockDisplay() {
 
 
 void displayTime() {
+   DateTime now = RTC.now();
+   
+       Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(' ');
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
+   
   String strCurrentTime;
   paintWord(arrIT, sizeof(arrIT),  colorWhite);
   paintWord(arrIS, sizeof(arrIS),  colorWhite);
@@ -256,73 +251,73 @@ void displayTime() {
 
   // now we display the appropriate minute counter
   
-  if ((minute() > 0) && (minute() < 5)) {
-    setMinuteInterval(5 - minute());
+  if ((now.minute() > 0) && (now.minute() < 5)) {
+    setMinuteInterval(5 - now.minute());
   }
-  if ((minute() > 4) && (minute() < 10)) {
+  if ((now.minute() > 4) && (now.minute() < 10)) {
     // FIVE MINUTES
     strCurrentTime = "five ";
     selectedINCMT[0] = 1;
-    setMinuteInterval(10 - minute());
+    setMinuteInterval(10 - now.minute());
   }
-  if ((minute() > 9) && (minute() < 15)) {
+  if ((now.minute() > 9) && (now.minute() < 15)) {
     //TEN MINUTES;
     strCurrentTime = "ten ";
     selectedINCMT[1] = 1;
     setMinuteInterval(15 - minute());
   }
-  if ((minute() > 14) && (minute() < 20)) {
+  if ((now.minute() > 14) && (now.minute() < 20)) {
     // QUARTER
     strCurrentTime = "a quarter ";
     selectedINCMT[2] = 1;
     selectedINCMT[3] = 1;
-    setMinuteInterval(20 - minute());
+    setMinuteInterval(20 - now.minute());
   }
-  if ((minute() > 19) && (minute() < 25)) {
+  if ((now.minute() > 19) && (now.minute() < 25)) {
     //TWENTY MINUTES
     strCurrentTime = "twenty ";
     selectedINCMT[5] = 1;
-    setMinuteInterval(25 - minute());
+    setMinuteInterval(25 - now.minute());
   }
-  if ((minute() > 24) && (minute() < 30)) {
+  if ((now.minute() > 24) && (now.minute() < 30)) {
     //TWENTY FIVE
     strCurrentTime = "twenty five ";
     selectedINCMT[0] = 1;
     selectedINCMT[5] = 1;
-    setMinuteInterval(30 - minute());
+    setMinuteInterval(30 - now.minute());
   }
-  if ((minute() > 29) && (minute() < 35)) {
+  if ((now.minute() > 29) && (now.minute() < 35)) {
     strCurrentTime = "half ";
     selectedINCMT[4] = 1;
-    setMinuteInterval(35 - minute());
+    setMinuteInterval(35 - now.minute());
   }
-  if ((minute() > 34) && (minute() < 40)) {
+  if ((now.minute() > 34) && (now.minute() < 40)) {
     //TWENTY FIVE
     strCurrentTime = "twenty five ";
     selectedINCMT[0] = 1;
     selectedINCMT[5] = 1;
-    setMinuteInterval(40 - minute());
+    setMinuteInterval(40 - now.minute());
   }
-  if ((minute() > 39) && (minute() < 45)) {
+  if ((now.minute() > 39) && (now.minute() < 45)) {
     strCurrentTime = "twenty ";
     selectedINCMT[5] = 1;
     setMinuteInterval(45 - minute());
   }
-  if ((minute() > 44) && (minute() < 50)) {
+  if ((now.minute() > 44) && (now.minute() < 50)) {
     strCurrentTime = "a quarter ";
     selectedINCMT[2] = 1;
     selectedINCMT[3] = 1;
-    setMinuteInterval(50 - minute());
+    setMinuteInterval(50 - now.minute());
   }
-  if ((minute() > 49) && (minute() < 55)) {
+  if ((now.minute() > 49) && (now.minute() < 55)) {
     strCurrentTime = "ten ";
     selectedINCMT[1] = 1;
-    setMinuteInterval(55 - minute());
+    setMinuteInterval(55 - now.minute());
   }
-  if (minute() > 54) {
+  if (now.minute() > 54) {
     strCurrentTime = "five ";
     selectedINCMT[0] = 1;
-    setMinuteInterval(60 - minute());
+    setMinuteInterval(60 - now.minute());
   }
 
   //paint the words
@@ -336,8 +331,8 @@ void displayTime() {
 
 
   // if we are less than 5 minutes past top of the hour
-  if (minute() < 5) {
-    switch (hour()) {
+  if (now.minute() < 5) {
+    switch (now.hour()) {
       case 1:
       case 13:
         strCurrentTime = strCurrentTime + "one ";
@@ -417,13 +412,13 @@ void displayTime() {
 
 
     // we are more than 4 minutes but less and 35 minutes past top of hour
-  } else if ((minute() < 35) && (minute() > 4)) {
+  } else if ((now.minute() < 35) && (now.minute() > 4)) {
     strCurrentTime = strCurrentTime + "past ";
     paintWord(arrPAST, sizeof(arrPAST),  colorWhite);
     paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
     paintWord(arrTO, sizeof(arrTO), colorBlack);
 
-    switch (hour()) {
+    switch (now.hour()) {
       case 1:
       case 13:
         strCurrentTime = strCurrentTime + "one ";
@@ -503,7 +498,7 @@ void displayTime() {
     paintWord(arrOCLOCK, sizeof(arrOCLOCK),  colorBlack);
     paintWord(arrTO, sizeof(arrTO),  colorWhite);
 
-    switch (hour()) {
+    switch (now.hour()) {
       case 1:
       case 13:
         strCurrentTime = strCurrentTime + "two ";
@@ -577,27 +572,27 @@ void displayTime() {
   }
 
   // Change AM and PM colors
-  if (isAM() && hour() <= 6) {
+  if (now.hour() > 0 &&  now.hour() <= 6) {
     paintWord(AM, sizeof(AM), colorMagenta);
     paintWord(PM, sizeof(PM), colorBlack);
   }
-  if (isAM() && hour() > 6 && hour() <= 10) {
+  if ( now.hour() > 6 && now.hour() <= 10) {
     paintWord(AM, sizeof(AM), colorYellow);
     paintWord(PM, sizeof(PM), colorBlack);
   }
-    if (isAM() && hour() > 10) {
+    if (now.hour() <= 12 && now.hour() > 10) {
     paintWord(AM, sizeof(AM), colorTeal);
     paintWord(PM, sizeof(PM), colorBlack);
   }
-  if (isPM() && hour() < 17) {
+  if (now.hour() > 12 && now.hour() < 17) {
     paintWord(PM, sizeof(PM), colorLblue);
     paintWord(AM, sizeof(AM), colorBlack);
   }
-  if (isPM() && hour() >= 17 && hour() < 22) {
+  if ( now.hour() >= 17 && now.hour() < 22) {
     paintWord(PM, sizeof(PM), colorOrange);
     paintWord(AM, sizeof(AM), colorBlack);
   }
-    if (isPM() && hour() > 22) {
+    if (now.hour() <= 24 && now.hour() > 22) {
     paintWord(PM, sizeof(PM), colorRed);
     paintWord(AM, sizeof(AM), colorBlack);
   }
@@ -806,22 +801,23 @@ void numOneStunna() {
 
 //Birthdays
 void isBirthday() {
+   DateTime now = RTC.now();
   // Ryannes Birthday
-  if ((month() == 3) && (day() == 29)) {
+  if ((now.month() == 3) && (now.day() == 29)) {
     paintWord(RYANNES, sizeof(RYANNES), colorBlue);
     paintWord(BIRTH, sizeof(BIRTH), colorBlue);
     paintWord(DAY, sizeof(DAY), colorBlue);
   }
 
   // Toms Birthday
-  if ((month() == 7) && (day() == 10)) {
+  if ((now.month() == 7) && (now.day() == 10)) {
     paintWord(TOMMYS, sizeof(TOMMYS), colorRed);
     paintWord(BIRTH, sizeof(BIRTH), colorRed);
     paintWord(DAY, sizeof(DAY), colorRed);
   }
 
   // Jack's Birthday
-  if ((month() == 7) && (day() == 11)) {
+  if ((now.month() == 7) && (now.day() == 11)) {
     paintWord(BIRTH, sizeof(BIRTH), colorRed);
     paintWord(DAY, sizeof(DAY), colorRed);
   }
