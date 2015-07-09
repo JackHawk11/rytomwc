@@ -36,10 +36,13 @@ uint32_t colorRed = grid.Color(255, 0, 0);
 uint32_t colorGreen = grid.Color(0, 255, 0);
 uint32_t colorBlue = grid.Color(0, 0, 255);
 uint32_t colorJGreen = grid.Color(50, 179, 30);
-uint32_t colorMagenta = grid.Color(179, 70, 2);
-uint32_t colorYellow = grid.Color(240, 240, 67);
-uint32_t colorTeal = grid.Color(67, 237, 240);
+uint32_t colorLblue = grid.Color(2, 70, 179);
+uint32_t colorMagenta = grid.Color(240, 29, 113);
+uint32_t colorYellow = grid.Color(246, 252, 45);
+uint32_t colorTeal = grid.Color(39, 232, 242);
 uint32_t colorOrange = grid.Color(237, 89, 26);
+uint32_t colorPeach = grid.Color(255, 188, 130);
+
 
 
 // THATS SO METAL
@@ -176,7 +179,7 @@ void loop() {
     //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
     grid.show();
   } else {
-    colorWipe(colorBlack, 0);
+
     grid.setPixelColor(0, colorRed);
     Serial.println("The time has not been set.  Please run the Time");
     Serial.println("TimeRTCSet example, or DS1307RTC SetTime example.");
@@ -184,6 +187,7 @@ void loop() {
     delay(4000);
   }
   delay(500);
+   incrementTime(60);
 }
 
 void incrementTime(int intSeconds) {
@@ -574,20 +578,28 @@ void displayTime() {
   }
 
   // Change AM and PM colors
-  if (isAM() && hour() > 6) {
+  if (isAM() && hour() <= 6) {
     paintWord(AM, sizeof(AM), colorMagenta);
     paintWord(PM, sizeof(PM), colorBlack);
   }
-  if (isAM() && hour() <= 6) {
+  if (isAM() && hour() > 6 && hour() <= 10) {
     paintWord(AM, sizeof(AM), colorYellow);
     paintWord(PM, sizeof(PM), colorBlack);
   }
+    if (isAM() && hour() > 10) {
+    paintWord(AM, sizeof(AM), colorTeal);
+    paintWord(PM, sizeof(PM), colorBlack);
+  }
   if (isPM() && hour() < 17) {
-    paintWord(PM, sizeof(PM), colorJGreen);
+    paintWord(PM, sizeof(PM), colorLblue);
     paintWord(AM, sizeof(AM), colorBlack);
   }
-  if (isPM() && hour() >= 17) {
-    paintWord(PM, sizeof(PM), colorJGreen);
+  if (isPM() && hour() >= 17 && hour() < 22) {
+    paintWord(PM, sizeof(PM), colorOrange);
+    paintWord(AM, sizeof(AM), colorBlack);
+  }
+    if (isPM() && hour() > 22) {
+    paintWord(PM, sizeof(PM), colorRed);
     paintWord(AM, sizeof(AM), colorBlack);
   }
 
