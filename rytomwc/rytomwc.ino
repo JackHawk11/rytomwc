@@ -21,7 +21,7 @@ RTC_DS1307 RTC;
 #define N_LEDS 200 // 115 x 15 grid + four corners
 #define TIME_HEADER  "T"   // Header tag for serial time sync message
 #define BRIGHTNESSDAY 150 // full on
-#define BRIGHTNESSNIGHT 10 // half on
+#define BRIGHTNESSNIGHT 50 // half on
 
 Adafruit_NeoPixel grid = Adafruit_NeoPixel(200 , 4, NEO_GRB + NEO_KHZ800);
 
@@ -114,12 +114,13 @@ void setup() {
     Wire.begin();
     RTC.begin();
  
-  if (! RTC.isrunning()) {
+ // if (! RTC.isrunning()) {
     Serial.println("RTC is NOT running!");
     // following line sets the RTC to the date & time this sketch was compiled
-    //RTC.adjust(DateTime(__DATE__, __TIME__));
-     grid.setPixelColor(0, colorRed);
-  }
+    RTC.adjust(DateTime(__DATE__, __TIME__));
+    // grid.setPixelColor(0, colorRed);
+  //}
+ 
 
   // setup the LED strip
   grid.begin();
@@ -141,7 +142,7 @@ void loop() {
   DateTime now = RTC.now();
 
     // time is set lets show the time
-    if ((hour() < 7) | (hour() >= 19)) {
+    if ((now.hour() < 7) | (now.hour() >= 19)) {
       intBrightness =  BRIGHTNESSNIGHT;
     } else {
       intBrightness =  BRIGHTNESSDAY;
@@ -168,21 +169,23 @@ void loop() {
     // numOneStunna();
     //thatsSoMetal();
     //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
+
     grid.show();
   delay(600);
 }
 
 void digitalClockDisplay() {
+  DateTime now = RTC.now();
   // digital clock display of the time
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
+  Serial.print(now.hour());
+  printDigits(now.minute());
+  printDigits(now.second());
   Serial.print(" ");
-  Serial.print(year());
+  Serial.print(now.year());
   Serial.print("-");
-  Serial.print(month());
+  Serial.print(now.month());
   Serial.print("-");
-  Serial.print(day());
+  Serial.print(now.day());
   Serial.println();
 }
 
