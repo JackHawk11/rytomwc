@@ -20,8 +20,11 @@ RTC_DS1307 RTC;
 
 #define N_LEDS 200 // 115 x 15 grid + four corners
 #define TIME_HEADER  "T"   // Header tag for serial time sync message
-#define BRIGHTNESSDAY 150 // full on
-#define BRIGHTNESSNIGHT 50 // half on
+#define BRIGHTNESSDAY 80 // full on
+#define BRIGHTNESSNIGHT 20 // half on /// 120
+
+//MAX 80 letters at 150 brightness for the color white
+//each led draws 20mA per channel (r,g,b), white draws 60mA on each LED
 
 Adafruit_NeoPixel grid = Adafruit_NeoPixel(200 , 4, NEO_GRB + NEO_KHZ800);
 
@@ -32,7 +35,8 @@ String strTime = ""; // used to detect if word time has changed
 int intTimeUpdated = 0; // used to tell if we need to turn on the brightness again when words change
 
 // a few colors
-uint32_t colorWhite = grid.Color(255, 255, 255);
+uint32_t colorWhite = grid.Color(250, 250, 250);
+uint32_t colorOFFWhite = grid.Color(200, 200 , 200);
 uint32_t colorBlack = grid.Color(0, 0, 0);
 uint32_t colorRed = grid.Color(255, 0, 0);
 uint32_t colorGreen = grid.Color(0, 255, 0);
@@ -106,21 +110,28 @@ int arrELEVEN[6] = {94, 93, 92, 91, 90, 89};
 int arrTWELVE[6] = {77, 78, 79, 80, 81, 82};
 int arrTWENTY[6] = {154, 155, 156, 157, 158, 159};
 
+//ROWS
+int ROWONE[14] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+int ROWSIX[14] = {70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83};
+int ROWSEVEN[14] = {84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97};
+int ROWEIGHT[14] = {98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111};
+int ROWTHIRTEEN[14] = {168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181};
+int ROWFOURTEEN[14] = {182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195};
+
 
 
 void setup() {
   // set up the debuging serial output
   Serial.begin(9600);
-    Wire.begin();
-    RTC.begin();
- 
- // if (! RTC.isrunning()) {
+  Wire.begin();
+  RTC.begin();
+
+  if (! RTC.isrunning()) {
     Serial.println("RTC is NOT running!");
     // following line sets the RTC to the date & time this sketch was compiled
     RTC.adjust(DateTime(__DATE__, __TIME__));
-    // grid.setPixelColor(0, colorRed);
-  //}
- 
+  }
+
 
   // setup the LED strip
   grid.begin();
@@ -134,78 +145,78 @@ void setup() {
   pinMode(FWDButtonPIN, INPUT);
   pinMode(REVButtonPIN, INPUT);
 
-  // lets kick off the clock
-  digitalClockDisplay();
+}
+
+bool canForwardTime(DateTime now) {
+  if (now.minute() >= 59 && now.hour() >= 23)
+  {
+    Serial.println("Nope can't go any further here!");
+    return false;
+  }
+  return  true;
+}
+
+bool canRewindTime(DateTime now) {
+  if (now.minute() <= 1 && now.hour() <= 1)
+  {
+    Serial.println("Nope can't go back any further here!");
+    return false;
+  }
+  return  true;
 }
 
 void loop() {
   DateTime now = RTC.now();
 
-    // time is set lets show the time
-    if ((now.hour() < 7) | (now.hour() >= 19)) {
-      intBrightness =  BRIGHTNESSNIGHT;
-    } else {
-      intBrightness =  BRIGHTNESSDAY;
-    }
-    grid.setBrightness(intBrightness);
+  // time is set lets show the time
+  if ((now.hour() < 7) | (now.hour() >= 19)) {
+    intBrightness =  BRIGHTNESSNIGHT;
+  } else {
+    intBrightness =  BRIGHTNESSDAY;
+  }
+  grid.setBrightness(intBrightness);
 
-    // test to see if a forward button is being held down for time setting
-    if (digitalRead(FWDButtonPIN) == HIGH) {
-      Serial.println("Forward Button Down");
-      //incrementTime(60);
+  // forward button held to increment time ahead by 1 minute
+  if (digitalRead(FWDButtonPIN) == HIGH) {
+    Serial.println("Forward Button Down");
+    if (canForwardTime(now)) {
       RTC.adjust(now.unixtime() + 60);
     }
+  }
 
-    // test to see if the back button is being held down for time setting
-    if (digitalRead(REVButtonPIN) == HIGH) {
-      Serial.println("Backwards Button Down");
-      //incrementTime(-60);
-      RTC.adjust(now.unixtime() -60);
+  // forward button held to increment time behind by 1 minute
+  if (digitalRead(REVButtonPIN) == HIGH) {
+    Serial.println("Backwards Button Down");
+    if (canRewindTime(now)) {
+      RTC.adjust(now.unixtime() - 60);
     }
+  }
 
-    // and finaly we display the time (provided we are not in self tes mode
-    displayTime();
-    // displayMonth();
-    // numOneStunna();
-    //thatsSoMetal();
-    //paintWord(RYANNES, sizeof(RYANNES), colorGreen);
-
-    grid.show();
+  // and finaly we display the time (provided we are not in self tes mode
+  displayTime();
+  // displayMonth();
+  // numOneStunna();
+  //thatsSoMetal();
+  //paintWord(RYANNES, sizeof(RYANNES), colorWhite);
+  grid.show();
   delay(600);
 }
 
-void digitalClockDisplay() {
-  DateTime now = RTC.now();
-  // digital clock display of the time
-  Serial.print(now.hour());
-  printDigits(now.minute());
-  printDigits(now.second());
-  Serial.print(" ");
-  Serial.print(now.year());
-  Serial.print("-");
-  Serial.print(now.month());
-  Serial.print("-");
-  Serial.print(now.day());
-  Serial.println();
-}
-
-
 void displayTime() {
-   DateTime now = RTC.now();
-   
-       Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(' ');
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println();
-   
+  DateTime now = RTC.now();
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(' ');
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
+
   String strCurrentTime;
   paintWord(arrIT, sizeof(arrIT),  colorWhite);
   paintWord(arrIS, sizeof(arrIS),  colorWhite);
@@ -242,8 +253,8 @@ void displayTime() {
   int selectedHourINCMT[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
   // now we display the appropriate minute counter
-  
-  if ((now.minute() > 0) && (now.minute() < 5)) {
+
+  if ((now.minute() >= 0) && (now.minute() < 5)) {
     setMinuteInterval(5 - now.minute());
   }
   if ((now.minute() > 4) && (now.minute() < 10)) {
@@ -572,7 +583,7 @@ void displayTime() {
     paintWord(AM, sizeof(AM), colorYellow);
     paintWord(PM, sizeof(PM), colorBlack);
   }
-    if (now.hour() <= 12 && now.hour() > 10) {
+  if (now.hour() <= 12 && now.hour() > 10) {
     paintWord(AM, sizeof(AM), colorTeal);
     paintWord(PM, sizeof(PM), colorBlack);
   }
@@ -584,23 +595,14 @@ void displayTime() {
     paintWord(PM, sizeof(PM), colorOrange);
     paintWord(AM, sizeof(AM), colorBlack);
   }
-    if (now.hour() <= 24 && now.hour() > 22) {
+  if (now.hour() <= 24 && now.hour() > 22) {
     paintWord(PM, sizeof(PM), colorRed);
     paintWord(AM, sizeof(AM), colorBlack);
-  }
-
-  if (strCurrentTime != strTime) {
-    digitalClockDisplay();
-    strTime = strCurrentTime;
-    if (strTime == "") {
-      fadeIn(20);
-    }
-  } else {
-    //    grid.show();
   }
 }
 
 void setMinuteInterval(int interval) {
+  Serial.println(interval);
   switch (interval) {
     case 1:
       grid.setPixelColor(196, colorBlue);
@@ -793,7 +795,7 @@ void numOneStunna() {
 
 //Birthdays
 void isBirthday() {
-   DateTime now = RTC.now();
+  DateTime now = RTC.now();
   // Ryannes Birthday
   if ((now.month() == 3) && (now.day() == 29)) {
     paintWord(RYANNES, sizeof(RYANNES), colorBlue);
@@ -814,4 +816,3 @@ void isBirthday() {
     paintWord(DAY, sizeof(DAY), colorRed);
   }
 }
-
